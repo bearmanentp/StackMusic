@@ -2,237 +2,147 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>로컬 뮤직 플레이어</title>
+    <title>영구 저장 로컬 플레이어</title>
     <style>
-        /* OlgaKoplik의 디자인 감성을 반영한 스타일 */
-        :root {
-            --primary: #ff5e5e;
-            --bg: #1e1e26;
-            --card: #2d2d37;
-            --text: #ffffff;
+        :root { --primary: #00d2ff; --bg: #0f2027; --card: #203a43; --text: #ffffff; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; justify-content: center; padding: 20px; }
+        .player-card { background: var(--card); padding: 30px; border-radius: 15px; width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .status { font-size: 0.8rem; color: var(--primary); margin-bottom: 10px; height: 1rem; }
+        
+        /* 리스트 스타일 */
+        .playlist { 
+            margin-top: 20px; max-height: 300px; overflow-y: auto; 
+            background: rgba(0,0,0,0.2); border-radius: 10px; padding: 10px;
         }
-
-        body {
-            background-color: var(--bg);
-            color: var(--text);
-            font-family: 'Segoe UI', sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            margin: 0;
+        .song-item { 
+            padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1); 
+            cursor: pointer; display: flex; justify-content: space-between; align-items: center;
         }
-
-        .player-card {
-            background: var(--card);
-            padding: 2rem;
-            border-radius: 20px;
-            box-shadow: 0 15px 35px rgba(0,0,0,0.5);
-            width: 350px;
-            text-align: center;
-        }
-
-        .album-art {
-            width: 200px;
-            height: 200px;
-            border-radius: 50%;
-            background: linear-gradient(45deg, #ff5e5e, #ff99ac);
-            margin: 0 auto 1.5rem;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 0 20px rgba(255, 94, 94, 0.4);
-            animation: rotate 10s linear infinite;
-            animation-play-state: paused;
-        }
-
-        .album-art.playing { animation-play-state: running; }
-
-        @keyframes rotate { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-
-        .info h2 { margin: 10px 0 5px; font-size: 1.2rem; }
-        .info p { color: #888; font-size: 0.9rem; margin-bottom: 20px; }
-
-        /* prakhar625 스타일의 컨트롤러 */
-        .controls {
-            display: flex;
-            justify-content: space-around;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        button {
-            background: none;
-            border: none;
-            color: white;
-            cursor: pointer;
-            font-size: 1.5rem;
-            transition: 0.3s;
-        }
-
-        button:hover { color: var(--primary); }
-
-        #playBtn {
-            width: 60px;
-            height: 60px;
-            background: var(--primary);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        /* 재생 목록 스타일 */
-        .playlist-container {
-            margin-top: 20px;
-            max-height: 150px;
-            overflow-y: auto;
-            text-align: left;
-            border-top: 1px solid #444;
-            padding-top: 10px;
-        }
-
-        .playlist-item {
-            padding: 8px;
-            font-size: 0.85rem;
-            cursor: pointer;
-            border-radius: 5px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .playlist-item:hover { background: rgba(255,255,255,0.1); }
-
-        input[type="file"] { margin-bottom: 15px; width: 100%; font-size: 0.8rem; }
+        .song-item:hover { background: rgba(255,255,255,0.1); }
+        .song-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.9rem; }
+        
+        .controls { display: flex; gap: 10px; margin-top: 20px; align-items: center; }
+        button { cursor: pointer; background: var(--primary); border: none; padding: 8px 15px; border-radius: 5px; font-weight: bold; }
+        .delete-all { background: #ff4b2b; color: white; font-size: 0.7rem; margin-top: 10px; }
+        
+        #audio { width: 100%; margin-top: 20px; filter: invert(1); }
     </style>
 </head>
 <body>
 
 <div class="player-card">
-    <div class="album-art" id="disk">🎵</div>
+    <h3>My Local Jukebox</h3>
+    <div id="status" class="status">시스템 준비됨</div>
     
-    <div class="info">
-        <h2 id="title">음악을 추가하세요</h2>
-        <p id="artist">Local Storage Player</p>
-    </div>
-
     <input type="file" id="fileInput" multiple accept="audio/*" webkitdirectory>
-
-    <div class="controls">
-        <button id="prevBtn">⏮</button>
-        <button id="playBtn">▶</button>
-        <button id="nextBtn">⏭</button>
+    
+    <audio id="audio" controls></audio>
+    
+    <div class="playlist" id="playlist">
+        <div style="text-align: center; color: #888;">추가된 곡이 없습니다.</div>
     </div>
 
-    <div class="playlist-container" id="playlist">
-        </div>
+    <button class="delete-all" onclick="clearAllData()">모든 데이터 초기화</button>
 </div>
 
-<audio id="mainAudio"></audio>
-
 <script>
-    const audio = document.getElementById('mainAudio');
-    const playBtn = document.getElementById('playBtn');
-    const disk = document.getElementById('disk');
-    const fileInput = document.getElementById('fileInput');
-    const playlistArea = document.getElementById('playlist');
-    const title = document.getElementById('title');
-
+    const dbName = "PermanentMusicDB";
+    const storeName = "songs";
     let db;
-    let currentSongs = [];
-    let currentIndex = 0;
 
-    // 1. IndexedDB 초기화 (영구 저장소)
-    const request = indexedDB.open("MusicPlayerDB", 1);
+    // 1. 데이터베이스 연결 (영구 저장 설정)
+    const request = indexedDB.open(dbName, 1);
     request.onupgradeneeded = (e) => {
         db = e.target.result;
-        db.createObjectStore("songs", { keyPath: "name" });
+        if (!db.objectStoreNames.contains(storeName)) {
+            db.createObjectStore(storeName, { keyPath: "name" });
+        }
     };
     request.onsuccess = (e) => {
         db = e.target.result;
-        refreshPlaylist();
+        updateStatus("데이터 로드 완료");
+        displayPlaylist();
     };
 
-    // 2. 파일 선택 및 저장 로직
-    fileInput.onchange = async (e) => {
+    // 2. 파일 저장 로직 (핵심: ArrayBuffer로 변환하여 DB에 박기)
+    document.getElementById('fileInput').onchange = async (e) => {
         const files = Array.from(e.target.files);
-        const transaction = db.transaction(["songs"], "readwrite");
-        const store = transaction.objectStore("songs");
+        updateStatus(`${files.length}개의 파일을 처리 중...`);
 
         for (const file of files) {
-            if (file.type.startsWith('audio/')) {
-                const reader = new FileReader();
-                reader.onload = (ev) => {
-                    store.put({ name: file.name, data: ev.target.result });
-                    if (file === files[files.length - 1]) setTimeout(refreshPlaylist, 500);
+            if (!file.type.startsWith('audio/')) continue;
+
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                const transaction = db.transaction([storeName], "readwrite");
+                const store = transaction.objectStore(storeName);
+                
+                store.put({
+                    name: file.name,
+                    data: ev.target.result, // 실제 파일 바이너리 데이터
+                    type: file.type
+                });
+
+                transaction.oncomplete = () => {
+                    displayPlaylist();
                 };
-                reader.readAsArrayBuffer(file);
-            }
+            };
+            reader.readAsArrayBuffer(file);
         }
+        updateStatus("모든 곡 저장 완료!");
     };
 
-    // 3. 플레이리스트 갱신 (저장된 데이터 불러오기)
-    function refreshPlaylist() {
-        const transaction = db.transaction(["songs"], "readonly");
-        const store = transaction.objectStore("songs");
-        const getAll = store.getAll();
+    // 3. 리스트 출력
+    function displayPlaylist() {
+        const transaction = db.transaction([storeName], "readonly");
+        const store = transaction.objectStore(storeName);
+        const request = store.getAll();
 
-        getAll.onsuccess = () => {
-            currentSongs = getAll.result;
-            playlistArea.innerHTML = '';
-            currentSongs.forEach((song, index) => {
+        request.onsuccess = () => {
+            const songs = request.result;
+            const container = document.getElementById('playlist');
+            container.innerHTML = '';
+
+            if (songs.length === 0) {
+                container.innerHTML = '<div style="text-align: center; color: #888;">목록이 비어있습니다.</div>';
+                return;
+            }
+
+            songs.forEach(song => {
                 const div = document.createElement('div');
-                div.className = 'playlist-item';
-                div.innerText = song.name;
-                div.onclick = () => playSong(index);
-                playlistArea.appendChild(div);
+                div.className = 'song-item';
+                div.innerHTML = `<span class="song-name">${song.name}</span>`;
+                div.onclick = () => playSong(song);
+                container.appendChild(div);
             });
         };
     }
 
-    // 4. 재생 로직 (prakhar625 스타일 컨트롤)
-    function playSong(index) {
-        if (currentSongs.length === 0) return;
-        currentIndex = index;
-        const song = currentSongs[currentIndex];
-        
-        const blob = new Blob([song.data], { type: 'audio/mp3' });
+    // 4. 재생 (DB에서 꺼내서 URL로 변환)
+    function playSong(song) {
+        const audio = document.getElementById('audio');
+        const blob = new Blob([song.data], { type: song.type });
         const url = URL.createObjectURL(blob);
         
         audio.src = url;
         audio.play();
-        
-        title.innerText = song.name;
-        playBtn.innerText = '⏸';
-        disk.classList.add('playing');
+        updateStatus(`재생 중: ${song.name}`);
     }
 
-    playBtn.onclick = () => {
-        if (audio.paused) {
-            audio.play();
-            playBtn.innerText = '⏸';
-            disk.classList.add('playing');
-        } else {
-            audio.pause();
-            playBtn.innerText = '▶';
-            disk.classList.remove('playing');
+    function updateStatus(msg) {
+        document.getElementById('status').innerText = msg;
+    }
+
+    // 5. 초기화 기능 (지우고 싶을 때)
+    function clearAllData() {
+        if (confirm("정말 모든 음악 데이터를 지우시겠습니까?")) {
+            const transaction = db.transaction([storeName], "readwrite");
+            transaction.objectStore(storeName).clear();
+            transaction.oncomplete = () => {
+                location.reload();
+            };
         }
-    };
-
-    document.getElementById('nextBtn').onclick = () => {
-        currentIndex = (currentIndex + 1) % currentSongs.length;
-        playSong(currentIndex);
-    };
-
-    document.getElementById('prevBtn').onclick = () => {
-        currentIndex = (currentIndex - 1 + currentSongs.length) % currentSongs.length;
-        playSong(currentIndex);
-    };
-
-    // 자동 다음곡 재생
-    audio.onended = () => document.getElementById('nextBtn').click();
-
+    }
 </script>
 
 </body>
